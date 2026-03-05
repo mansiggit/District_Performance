@@ -11,7 +11,7 @@
 ### *A bilingual MGNREGA district performance analytics dashboard for rural India*
 
 <p align="center">
-  <a href="#-demo">Live Demo</a> •
+  <a href="https://district-performance.vercel.app/">Live Demo</a> •
   <a href="#-features">Features</a> •
   <a href="#-screenshots">Screenshots</a> •
   <a href="#-tech-stack">Tech Stack</a> •
@@ -50,30 +50,25 @@ Designed with rural government workers and gram panchayat officials in mind, the
 
 ## 🖼️ Screenshots
 
-> *Add your project screenshots here by replacing the placeholder paths below.*
-
-<br/>
 
 ### 🏠 Dashboard Overview
 <p align="center">
-  <img src="./screenshots/dashboard-overview.png" alt="Dashboard Overview" width="90%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"/>
+  <img src="./imgs/dashboard.png" alt="Dashboard Overview" width="90%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"/>
 </p>
 
 <br/>
 
 ### 📊 Performance Chart (D3.js)
 <p align="center">
-  <img src="./screenshots/performance-chart.png" alt="Performance Chart" width="90%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"/>
+  <img src="./imgs/perf chart.png" alt="Performance Chart" width="90%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"/>
 </p>
 
 <br/>
 
 ### 🌐 Hindi Language Mode
 <p align="center">
-  <img src="./screenshots/hindi-mode.png" alt="Hindi Language Mode" width="90%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"/>
+  <img src="./imgs/hindi.png" alt="Hindi Language Mode" width="90%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"/>
 </p>
-
-> 📂 To add your screenshots: create a `/screenshots` folder in the root of this repo and drop your images there, then update the filenames above.
 
 ---
 
@@ -95,10 +90,10 @@ No installation. No build step. No server needed.
 ### Option 1 — Open Directly
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/DistrictPerformance.git
+git clone https://github.com/mansiggit/District_Performance.git
 
 # Navigate into it
-cd DistrictPerformance
+cd District_Performance
 
 # Open in browser
 open index.html        # macOS
