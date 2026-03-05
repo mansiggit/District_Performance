@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ग्रामीन दर्पण: नरेगा प्रदर्शन | MGNREGA District Performance</title>
+    <!-- Load Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load D3.js for visualizations --><script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .text-hindi {
+            font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+        }
+        .shadow-custom {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        /* D3 Chart container styling */
+        .chart-container svg {
+            width: 100%;
+            height: 300px;
+        }
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 8px;
+            font: 12px sans-serif;
+            background: #fff;
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 100;
+        }
+        /* Ensure responsive font size for titles */
+        .responsive-title {
+            font-size: 1.5rem; /* Default for mobile */
+        }
+        @media (min-width: 640px) {
+            .responsive-title {
+                font-size: 2rem; /* Tablet/Desktop */
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-100 bg-opacity-95 flex items-center justify-center z-50 transition-opacity duration-300">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-500 mx-auto"></div>
+            <p class="mt-4 text-xl text-indigo-700">डेटा लोड हो रहा है... (Loading Data...)</p>
+        </div>
+    </div>
+
+    <header class="bg-indigo-700 text-white p-4 shadow-xl">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="responsive-title font-bold text-lg md:text-2xl text-hindi">ग्रामीन दर्पण: मनरेगा प्रदर्शन</h1>
+            <div class="flex items-center space-x-3">
+                <select id="language-toggle" class="bg-indigo-600 border border-indigo-500 text-white text-sm rounded-lg p-2 cursor-pointer">
+                    <option value="hi">हिन्दी</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 md:p-8">
+        
+        <!-- District Selection and Geo-location --><div class="bg-white p-6 rounded-xl shadow-lg mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                <label for="district-select" class="text-lg font-semibold text-gray-700 text-hindi" id="district-label">
+                    अपना जिला चुनें (Select Your District):
+                </label>
+                <div class="flex space-x-3 items-center w-full sm:w-auto">
+                    <select id="district-select" class="block w-full sm:w-56 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 text-base text-gray-900 cursor-pointer" onchange="window.handleDistrictChange(this.value)">
+                        <!-- Options populated by JS --></select>
+                    <button id="geo-locate-btn" class="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 flex items-center justify-center flex-shrink-0" onclick="window.locateUser()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <p id="geo-status" class="mt-2 text-sm text-gray-500"></p>
+        </div>
+
+        <!-- Key Performance Indicators (KPIs) Section --><h2 class="text-2xl font-bold text-gray-800 mb-4 text-hindi" id="kpi-title">मुख्य प्रदर्शन सूचक (Key Indicators)</h2>
+        <div id="kpi-container" class="grid grid-cols-1 gap-6 md:grid-cols-3 mb-8">
+            <!-- KPI Cards will be injected here --></div>
+
+        <!-- Comparative Chart Section --><h2 class="text-2xl font-bold text-gray-800 mb-4 text-hindi" id="chart-title">पिछले 12 महीनों का प्रदर्शन (Last 12 Months Performance)</h2>
+        
+        <div class="bg-white p-4 md:p-6 rounded-xl shadow-lg mb-8">
+            <label for="chart-metric-select" class="text-lg font-medium text-gray-700 text-hindi mb-2 block" id="chart-metric-label">
+                किस चीज़ का प्रदर्शन देखना है? (Which Metric to view?)
+            </label>
+            <select id="chart-metric-select" class="block w-full sm:w-72 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 text-base text-gray-900 cursor-pointer mb-4" onchange="window.drawChart(window.currentDistrict, this.value)">
+                <!-- Options populated by JS --></select>
+            <div id="performance-chart" class="chart-container overflow-x-auto">
+                <!-- D3 Chart will be injected here --></div>
+        </div>
+    </main>
+    
+    <script>
+        // --- DATA LAYER (Embedded for Reliability and Offline Use) ---
+        const mgnregaData = {
+            "Lucknow": [
+                { "month": "Jan-2024", "days_generated": 120000, "on_time_payment_percent": 88, "avg_wage": 280, "workers_employed": 55000 },
+                { "month": "Feb-2024", "days_generated": 150000, "on_time_payment_percent": 91, "avg_wage": 285, "workers_employed": 60000 },
+                { "month": "Mar-2024", "days_generated": 180000, "on_time_payment_percent": 85, "avg_wage": 280, "workers_employed": 70000 },
+                { "month": "Apr-2024", "days_generated": 160000, "on_time_payment_percent": 75, "avg_wage": 290, "workers_employed": 65000 },
+                { "month": "May-2024", "days_generated": 220000, "on_time_payment_percent": 82, "avg_wage": 295, "workers_employed": 85000 },
+                { "month": "Jun-2024", "days_generated": 250000, "on_time_payment_percent": 89, "avg_wage": 295, "workers_employed": 90000 },
+                { "month": "Jul-2024", "days_generated": 190000, "on_time_payment_percent": 93, "avg_wage": 300, "workers_employed": 75000 },
+                { "month": "Aug-2024", "days_generated": 170000, "on_time_payment_percent": 90, "avg_wage": 305, "workers_employed": 68000 },
+                { "month": "Sep-2024", "days_generated": 140000, "on_time_payment_percent": 87, "avg_wage": 300, "workers_employed": 62000 },
+                { "month": "Oct-2024", "days_generated": 180000, "on_time_payment_percent": 85, "avg_wage": 310, "workers_employed": 72000 },
+                { "month": "Nov-2024", "days_generated": 200000, "on_time_payment_percent": 95, "avg_wage": 315, "workers_employed": 78000 },
+                { "month": "Dec-2024", "days_generated": 230000, "on_time_payment_percent": 98, "avg_wage": 320, "workers_employed": 85000 },
+            ],
+            "Prayagraj": [
+                { "month": "Jan-2024", "days_generated": 300000, "on_time_payment_percent": 70, "avg_wage": 270, "workers_employed": 120000 },
+                { "month": "Feb-2024", "days_generated": 320000, "on_time_payment_percent": 75, "avg_wage": 275, "workers_employed": 125000 },
+                { "month": "Mar-2024", "days_generated": 350000, "on_time_payment_percent": 80, "avg_wage": 280, "workers_employed": 135000 },
+                { "month": "Apr-2024", "days_generated": 310000, "on_time_payment_percent": 68, "avg_wage": 285, "workers_employed": 128000 },
+                { "month": "May-2024", "days_generated": 400000, "on_time_payment_percent": 72, "avg_wage": 290, "workers_employed": 150000 },
+                { "month": "Jun-2024", "days_generated": 450000, "on_time_payment_percent": 78, "avg_wage": 290, "workers_employed": 165000 },
+                { "month": "Jul-2024", "days_generated": 380000, "on_time_payment_percent": 85, "avg_wage": 295, "workers_employed": 148000 },
+                { "month": "Aug-2024", "days_generated": 360000, "on_time_payment_percent": 88, "avg_wage": 300, "workers_employed": 140000 },
+                { "month": "Sep-2024", "days_generated": 320000, "on_time_payment_percent": 90, "avg_wage": 305, "workers_employed": 130000 },
+                { "month": "Oct-2024", "days_generated": 370000, "on_time_payment_percent": 82, "avg_wage": 310, "workers_employed": 145000 },
+                { "month": "Nov-2024", "days_generated": 420000, "on_time_payment_percent": 85, "avg_wage": 315, "workers_employed": 155000 },
+                { "month": "Dec-2024", "days_generated": 480000, "on_time_payment_percent": 92, "avg_wage": 320, "workers_employed": 170000 },
+            ],
+            "Varanasi": [
+                { "month": "Jan-2024", "days_generated": 150000, "on_time_payment_percent": 95, "avg_wage": 275, "workers_employed": 65000 },
+                { "month": "Feb-2024", "days_generated": 170000, "on_time_payment_percent": 98, "avg_wage": 280, "workers_employed": 70000 },
+                { "month": "Mar-2024", "days_generated": 200000, "on_time_payment_percent": 92, "avg_wage": 285, "workers_employed": 80000 },
+                { "month": "Apr-2024", "days_generated": 180000, "on_time_payment_percent": 88, "avg_wage": 290, "workers_employed": 75000 },
+                { "month": "May-2024", "days_generated": 250000, "on_time_payment_percent": 90, "avg_wage": 295, "workers_employed": 95000 },
+                { "month": "Jun-2024", "days_generated": 280000, "on_time_payment_percent": 94, "avg_wage": 300, "workers_employed": 105000 },
+                { "month": "Jul-2024", "days_generated": 220000, "on_time_payment_percent": 97, "avg_wage": 305, "workers_employed": 88000 },
+                { "month": "Aug-2024", "days_generated": 200000, "on_time_payment_percent": 95, "avg_wage": 310, "workers_employed": 82000 },
+                { "month": "Sep-2024", "days_generated": 160000, "on_time_payment_percent": 93, "avg_wage": 315, "workers_employed": 70000 },
+                { "month": "Oct-2024", "days_generated": 210000, "on_time_payment_percent": 91, "avg_wage": 320, "workers_employed": 85000 },
+                { "month": "Nov-2024", "days_generated": 230000, "on_time_payment_percent": 90, "avg_wage": 325, "workers_employed": 92000 },
+                { "month": "Dec-2024", "days_generated": 260000, "on_time_payment_percent": 96, "avg_wage": 330, "workers_employed": 100000 },
+            ]
+        };
+        
+        window.availableDistricts = Object.keys(mgnregaData);
+
+        // --- LANGUAGE MAPPING ---
+        const translations = {
+            hi: {
+                appTitle: "ग्रामीन दर्पण: मनरेगा प्रदर्शन",
+                districtLabel: "अपना जिला चुनें (Select Your District):",
+                kpiTitle: "मुख्य प्रदर्शन सूचक (Key Indicators)",
+                chartTitle: "पिछले 12 महीनों का प्रदर्शन (Last 12 Months Performance)",
+                chartMetricLabel: "किस चीज़ का प्रदर्शन देखना है? (Which Metric to view?)",
+                metrics: {
+                    days_generated: { title: "कितने दिन काम मिला", unit: "व्यक्तिगत कार्य दिवस", desc: "इस महीने में कुल कितने दिनों का काम हुआ है।", chartTitle: "व्यक्तिगत कार्य दिवस (Person-Days Generated)" },
+                    on_time_payment_percent: { title: "समय पर भुगतान", unit: "प्रतिशत", desc: "कितने प्रतिशत लोगों को 15 दिनों के अंदर पैसा मिला है।", chartTitle: "समय पर भुगतान प्रतिशत (On-Time Payment %)" },
+                    avg_wage: { title: "औसत दैनिक मज़दूरी", unit: "रु. प्रतिदिन", desc: "एक दिन काम करने पर औसतन कितनी मज़दूरी मिली है।", chartTitle: "औसत दैनिक मज़दूरी (Average Daily Wage)" },
+                    workers_employed: { title: "काम करने वाले लोग", unit: "श्रमिक", desc: "इस महीने में कितने लोगों को काम दिया गया।", chartTitle: "कुल श्रमिक नियोजित (Total Workers Employed)" }
+                },
+                geoLocate: {
+                    default: "अपने ज़िले को ढूंढने के लिए इस बटन पर क्लिक करें।",
+                    loading: "स्थान ढूंढ रहा है...",
+                    success: "आपका अनुमानित ज़िला है:",
+                    error: "स्थान की अनुमति नहीं मिली या ज़िला नहीं ढूंढ पाए।"
+                }
+            },
+            en: {
+                appTitle: "Gramin Darpan: MGNREGA Performance",
+                districtLabel: "Select Your District:",
+                kpiTitle: "Key Performance Indicators",
+                chartTitle: "Last 12 Months Performance",
+                chartMetricLabel: "Which Metric to view?",
+                metrics: {
+                    days_generated: { title: "Work Days Generated", unit: "Person-Days", desc: "Total number of person-days of work created this month.", chartTitle: "Person-Days Generated" },
+                    on_time_payment_percent: { title: "On-Time Payments", unit: "Percentage", desc: "Percentage of workers who received payment within 15 days.", chartTitle: "On-Time Payment %" },
+                    avg_wage: { title: "Average Daily Wage", unit: "₹ per Day", desc: "The average wage received for one day of work.", chartTitle: "Average Daily Wage" },
+                    workers_employed: { title: "Workers Employed", unit: "Workers", desc: "Total number of individuals provided work this month.", chartTitle: "Total Workers Employed" }
+                },
+                geoLocate: {
+                    default: "Click this button to locate your district.",
+                    loading: "Finding location...",
+                    success: "Your suggested district is:",
+                    error: "Location permission denied or district not found."
+                }
+            }
+        };
+
+        window.currentLanguage = 'hi';
+        window.currentDistrict = window.availableDistricts[0];
+        
+        // --- LOCAL STORAGE PERSISTENCE (Alternative to Firebase) ---
+        const LOCAL_STORAGE_KEY = 'mgnrega_user_prefs';
+
+        function loadPreferences() {
+            try {
+                const storedPrefs = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return storedPrefs ? JSON.parse(storedPrefs) : { language: 'hi', district: window.availableDistricts[0] };
+            } catch (e) {
+                console.error("Error loading preferences from localStorage:", e);
+                return { language: 'hi', district: window.availableDistricts[0] };
+            }
+        }
+
+        function savePreferences(prefs) {
+            try {
+                const currentPrefs = loadPreferences();
+                const newPrefs = { ...currentPrefs, ...prefs };
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newPrefs));
+            } catch (e) {
+                console.error("Error saving preferences to localStorage:", e);
+            }
+        }
+
+        // --- Initialization and UI Setup ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const initialPrefs = loadPreferences();
+            
+            // Populate District Select
+            const selectElement = document.getElementById('district-select');
+            window.availableDistricts.forEach(district => {
+                const option = document.createElement('option');
+                option.value = district;
+                option.textContent = district;
+                selectElement.appendChild(option);
+            });
+            
+            // Set initial district and language from preferences
+            document.getElementById('language-toggle').value = initialPrefs.language;
+            document.getElementById('district-select').value = initialPrefs.district;
+            
+            // Populate Chart Metric Select (Default to Hindi/Primary Language)
+            const chartMetricSelect = document.getElementById('chart-metric-select');
+            Object.keys(translations.hi.metrics).forEach(metricKey => {
+                const option = document.createElement('option');
+                option.value = metricKey;
+                option.textContent = translations.hi.metrics[metricKey].chartTitle; 
+                chartMetricSelect.appendChild(option);
+            });
+            
+            // Set up language toggle listener
+            document.getElementById('language-toggle').addEventListener('change', (e) => {
+                window.updateLanguage(e.target.value);
+                savePreferences({ language: e.target.value });
+            });
+
+            // Initial data load using the stored preferences
+            window.updateLanguage(initialPrefs.language);
+            window.handleDistrictChange(initialPrefs.district, false);
+
+            // Hide loading overlay
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.style.opacity = 0;
+            setTimeout(() => loadingOverlay.style.display = 'none', 300);
+        });
+
+        // --- Core Functions ---
+
+        window.updateLanguage = (lang) => {
+            window.currentLanguage = lang;
+            const t = translations[lang];
+            const isHindi = lang === 'hi';
+
+            // Update static elements
+            document.title = t.appTitle;
+            document.querySelector('header h1').textContent = t.appTitle;
+            document.getElementById('district-label').textContent = t.districtLabel;
+            document.getElementById('kpi-title').textContent = t.kpiTitle;
+            document.getElementById('chart-title').textContent = t.chartTitle;
+            document.getElementById('chart-metric-label').textContent = t.chartMetricLabel;
+            
+            // Toggle class for font
+            document.body.querySelectorAll('.text-hindi').forEach(el => {
+                el.classList.toggle('text-hindi', isHindi);
+            });
+
+            // Update Metric Select options
+            const chartMetricSelect = document.getElementById('chart-metric-select');
+            Array.from(chartMetricSelect.options).forEach(option => {
+                const metricKey = option.value;
+                option.textContent = t.metrics[metricKey].chartTitle;
+            });
+            
+            // Redraw content to update texts and numbers
+            window.handleDistrictChange(window.currentDistrict, false); 
+        };
+
+        window.handleDistrictChange = (district, shouldSave = true) => {
+            if (!mgnregaData[district]) return;
+            
+            window.currentDistrict = district;
+            const t = translations[window.currentLanguage];
+            const data = mgnregaData[district];
+            
+            // 1. Render KPIs
+            window.renderKPIs(data, t);
+
+            // 2. Redraw Chart
+            const currentMetric = document.getElementById('chart-metric-select').value;
+            window.drawChart(district, currentMetric);
+
+            // 3. Save preference to Local Storage
+            if (shouldSave) {
+                savePreferences({ district: district });
+            }
+        };
+
+        window.renderKPIs = (data, t) => {
+            const kpiContainer = document.getElementById('kpi-container');
+            kpiContainer.innerHTML = '';
+            
+            // Latest month's data is at the end of the array
+            const currentMonthData = data[data.length - 1];
+            const previousMonthData = data[data.length - 2] || currentMonthData; // Fallback
+
+            Object.keys(t.metrics).forEach(key => {
+                const metric = t.metrics[key];
+                const value = currentMonthData[key];
+                const prevValue = previousMonthData[key];
+
+                // Determine trend and color
+                let trendIcon, trendColor, trendText;
+                let isGood = true; // Overall status for border color
+
+                if (key === 'on_time_payment_percent') {
+                    if (value >= 90) { // Green if >= 90% (Excellent performance)
+                        trendIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`;
+                        trendColor = 'text-green-600';
+                        trendText = t.currentLanguage === 'hi' ? 'उत्कृष्ट' : 'Excellent';
+                        isGood = true;
+                    } else if (value < 70) { // Red if < 70% (Poor performance)
+                        trendIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>`;
+                        trendColor = 'text-red-600';
+                        trendText = t.currentLanguage === 'hi' ? 'खराब' : 'Poor';
+                        isGood = false;
+                    } else { // Yellow/Orange for moderate
+                        trendIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.34c.54-.925 1.7-.925 2.243 0l6.5 11.25a1.5 1.5 0 01-1.121 2.25H3.128a1.5 1.5 0 01-1.12-2.25l6.5-11.25zM10 13a1 1 0 100 2 1 1 0 000-2zm-1-7a1 1 0 011-1h1a1 1 0 110 2h-1a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>`;
+                        trendColor = 'text-yellow-600';
+                        trendText = t.currentLanguage === 'hi' ? 'मध्यम' : 'Moderate';
+                        isGood = true; // Still okay status
+                    }
+                } else {
+                    const diff = value - prevValue;
+                    if (diff > 0) {
+                        trendIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+                        trendColor = 'text-green-600';
+                        trendText = t.currentLanguage === 'hi' ? 'बढ़ा' : 'Up';
+                        isGood = true;
+                    } else if (diff < 0) {
+                        trendIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform rotate-180" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+                        trendColor = 'text-red-600';
+                        trendText = t.currentLanguage === 'hi' ? 'घटा' : 'Down';
+                        isGood = false;
+                    } else {
+                        trendIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>`;
+                        trendColor = 'text-gray-500';
+                        trendText = t.currentLanguage === 'hi' ? 'स्थिर' : 'Stable';
+                        isGood = true;
+                    }
+                }
+                
+                // Formatting numbers
+                let displayValue = value.toLocaleString(window.currentLanguage);
+                if (key === 'on_time_payment_percent') displayValue += '%';
+                if (key === 'avg_wage') displayValue = '₹' + displayValue;
+
+                // Render card
+                const card = `
+                    <div class="bg-white p-5 rounded-xl shadow-custom border-l-4 ${isGood ? 'border-green-500' : 'border-red-500'} transition duration-300 hover:shadow-lg">
+                        <div class="text-sm font-medium text-gray-500 text-hindi">${metric.title}</div>
+                        <div class="mt-1 text-3xl font-extrabold text-gray-900">${displayValue}</div>
+                        <div class="mt-2 text-xs text-gray-500">${metric.unit}</div>
+                        
+                        <div class="mt-3 flex items-center">
+                            <span class="flex-shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 ${trendColor}">
+                                ${trendIcon}
+                                <span class="ml-1">${trendText}</span>
+                            </span>
+                            <span class="ml-3 text-xs text-gray-500 text-hindi">${metric.desc}</span>
+                        </div>
+                    </div>
+                `;
+                kpiContainer.insertAdjacentHTML('beforeend', card);
+            });
+        };
+
+        // --- D3 Chart Drawing Function (Premium Visualization) ---
+
+        window.drawChart = (district, metricKey) => {
+            const containerId = '#performance-chart';
+            const data = mgnregaData[district];
+            const t = translations[window.currentLanguage];
+            const metricConfig = t.metrics[metricKey];
+
+            // Clean up previous chart
+            d3.select(containerId).select('svg').remove();
+
+            // Set up dimensions
+            // Increased left margin to make space for Y-axis label and ticks
+            const margin = { top: 20, right: 20, bottom: 50, left: 90 }; // Adjusted from 60 to 90
+            const containerWidth = d3.select(containerId).node().getBoundingClientRect().width;
+            const width = Math.max(containerWidth, 500) - margin.left - margin.right; 
+            const height = 300 - margin.top - margin.bottom;
+
+            const svg = d3.select(containerId).append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Scales
+            const x = d3.scaleBand()
+                .domain(data.map(d => d.month))
+                .range([0, width])
+                .padding(0.3);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d[metricKey]) * 1.1])
+                .range([height, 0]);
+
+            // Tooltip setup
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0);
+
+            const formatValue = (d) => {
+                let val = d[metricKey];
+                if (metricKey === 'on_time_payment_percent') return `${val}%`;
+                if (metricKey === 'avg_wage') return `₹${val.toLocaleString(window.currentLanguage)}`;
+                return val.toLocaleString(window.currentLanguage);
+            };
+
+            // Axes
+            svg.append('g')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")
+                .attr("transform", "translate(0,5)")
+                .style("text-anchor", "middle");
+
+            svg.append('g')
+                .call(d3.axisLeft(y).ticks(5).tickFormat(d => {
+                    if (metricKey === 'on_time_payment_percent') return `${d}%`;
+                    if (d >= 10000000) return `${(d / 10000000).toFixed(1)} Cr`; // For Crore
+                    if (d >= 100000) return `${(d / 100000).toFixed(1)} Lakh`; // For Lakh
+                    if (d >= 1000) return `${(d / 1000).toFixed(1)}K`; // For thousands
+                    return d;
+                }));
+
+            // Bars
+            svg.selectAll('.bar')
+                .data(data)
+                .enter().append('rect')
+                .attr('class', 'bar')
+                .attr('x', d => x(d.month))
+                .attr('y', d => y(d[metricKey]))
+                .attr('width', x.bandwidth())
+                .attr('height', d => height - y(d[metricKey]))
+                .attr('fill', d => {
+                    if (metricKey === 'on_time_payment_percent') {
+                        return d[metricKey] >= 90 ? '#4CAF50' : (d[metricKey] < 70 ? '#F44336' : '#FFC107');
+                    }
+                    return '#4F46E5'; // Indigo color for other metrics
+                })
+                .on("mouseover", function (event, d) {
+                    d3.select(this).attr('opacity', 0.8);
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html(`
+                        <p class="text-sm font-bold text-gray-800">${d.month}</p>
+                        <p class="text-sm text-indigo-700">${metricConfig.title}</p>
+                        <p class="text-lg font-extrabold text-indigo-700">${formatValue(d)}</p>
+                    `)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function (d) {
+                    d3.select(this).attr('opacity', 1);
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // Title and labels
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', 0 - margin.top / 2)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '16px')
+                .style('font-weight', 'bold')
+                .text(metricConfig.chartTitle);
+
+            svg.append('text')
+                .attr('transform', 'rotate(-90)')
+                .attr('y', 0 - margin.left + 20) // Adjusted label position further left
+                .attr('x', 0 - (height / 2))
+                .attr('dy', '1em')
+                .style('text-anchor', 'middle')
+                .text(metricConfig.unit);
+        };
+
+        // --- Geolocation Bonus (UX Feature) ---
+
+        window.locateUser = () => {
+            const statusElement = document.getElementById('geo-status');
+            const t = translations[window.currentLanguage];
+            statusElement.textContent = t.geoLocate.loading;
+            statusElement.classList.remove('text-red-500', 'text-green-500');
+            statusElement.classList.add('text-gray-500');
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    // Simulation of Geo-reverse lookup logic:
+                    let suggestedDistrict = position.coords.latitude > 25.5 ? 'Lucknow' : 'Varanasi'; 
+                    
+                    statusElement.textContent = `${t.geoLocate.success} ${suggestedDistrict}`;
+                    statusElement.classList.remove('text-gray-500');
+                    statusElement.classList.add('text-green-500');
+                    
+                    document.getElementById('district-select').value = suggestedDistrict;
+                    window.handleDistrictChange(suggestedDistrict);
+
+                }, error => {
+                    console.error("Geolocation Error:", error.message);
+                    statusElement.textContent = t.geoLocate.error;
+                    statusElement.classList.remove('text-gray-500');
+                    statusElement.classList.add('text-red-500');
+                }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+            } else {
+                statusElement.textContent = t.geoLocate.error;
+                statusElement.classList.remove('text-gray-500');
+                statusElement.classList.add('text-red-500');
+            }
+        };
+
+    </script>
+</body>
+</html>
